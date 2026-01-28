@@ -1,6 +1,7 @@
 /**
- * E2E: identity-service → core-service → realtime-gateway (optional WS).
- * Prereqs: identity (3001), core (3002), realtime-gateway (3010), Redis; relay optional for event flow.
+ * E2E: identity-service → core-service → realtime-gateway.
+ * Prereqs: identity (3001), core (3002), realtime-gateway (3010), Redis.
+ * Third test (message → event on WS) also requires relay (core-service: npm run relay).
  */
 const IDENTITY_URL = process.env.IDENTITY_URL ?? "http://localhost:3001";
 const CORE_URL = process.env.CORE_URL ?? "http://localhost:3002";
@@ -104,6 +105,87 @@ describe("E2E full stack", () => {
 
     const msg = await subscribed;
     expect(msg.type).toBe("subscribed");
+    ws.close();
+  });
+
+  it("message created via core → event received on WebSocket (relay running)", async () => {
+    const { access_token, org_id } = await login();
+    const slug = `e2e-ws-${Date.now()}`;
+    const channelRes = await coreFetch("/channels", access_token, {
+      method: "POST",
+      body: JSON.stringify({ name: "E2E WS Channel", slug, visibility: "ORG" })
+    });
+    expect(channelRes.ok).toBe(true);
+    const channel = (await channelRes.json()) as { channel: { id: string } };
+    const channelId = channel.channel.id;
+
+    const threadRes = await coreFetch("/threads", access_token, {
+      method: "POST",
+      body: JSON.stringify({ channel_id: channelId, title: "E2E WS Thread", purpose: "E2E event test" })
+    });
+    expect(threadRes.ok).toBe(true);
+    const thread = (await threadRes.json()) as { thread: { id: string } };
+    const threadId = thread.thread.id;
+
+    const WebSocket = (await import("ws")).default;
+    const ws = new WebSocket(`${REALTIME_WS_URL}?access_token=${access_token}`);
+
+    const subscribed = new Promise<void>((resolve, reject) => {
+      ws.on("open", () => {
+        ws.send(
+          JSON.stringify({
+            type: "subscribe",
+            request_id: "e2e-ws-1",
+            payload: { org_id, topic: "inbox" }
+          })
+        );
+      });
+      ws.on("message", (data: Buffer) => {
+        try {
+          const msg = JSON.parse(data.toString()) as { type: string };
+          if (msg.type === "error") reject(new Error("Gateway sent error"));
+          if (msg.type === "subscribed") resolve();
+        } catch {
+          reject(new Error("Invalid JSON"));
+        }
+      });
+      ws.on("error", reject);
+    });
+    await subscribed;
+
+    const eventReceived = new Promise<{ type: string; payload?: { envelope?: { event_type?: string; payload?: { thread_id?: string } } } }>(
+      (resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.removeAllListeners("message");
+          reject(new Error("Timeout waiting for Core.MessageCreated event (is relay running? core-service: npm run relay)"));
+        }, 10000);
+        ws.on("message", (data: Buffer) => {
+          try {
+            const msg = JSON.parse(data.toString()) as {
+              type: string;
+              payload?: { envelope?: { event_type?: string; payload?: { thread_id?: string } } };
+            };
+            if (msg.type === "event" && msg.payload?.envelope?.event_type === "Core.MessageCreated" && msg.payload.envelope.payload?.thread_id === threadId) {
+              clearTimeout(timeout);
+              resolve(msg);
+            }
+          } catch {
+            // ignore non-JSON or unexpected shape
+          }
+        });
+      }
+    );
+
+    const messageRes = await coreFetch("/messages", access_token, {
+      method: "POST",
+      body: JSON.stringify({ thread_id: threadId, body: "E2E event test message", requires_response: false })
+    });
+    expect(messageRes.ok).toBe(true);
+
+    const event = await eventReceived;
+    expect(event.type).toBe("event");
+    expect(event.payload?.envelope?.event_type).toBe("Core.MessageCreated");
+    expect(event.payload?.envelope?.payload?.thread_id).toBe(threadId);
     ws.close();
   });
 });
