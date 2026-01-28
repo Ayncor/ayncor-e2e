@@ -1,0 +1,22 @@
+{
+  "name": "ayncor-e2e",
+  "version": "0.1.0",
+  "description": "Cross-repo E2E tests for identity-service, core-service, realtime-gateway. Run against running services.",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:e2e": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.18.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2",
+    "ws": "^8.19.0"
+  }
+}
