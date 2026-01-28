@@ -17,7 +17,7 @@ Before running E2E, the following must be running:
 - **realtime-gateway** (e.g. `ws://localhost:3010`)
 - **Redis** (used by realtime-gateway; relay and core-service if testing event flow)
 
-Optional for event flow: **relay** (core-service outbox → Redis).
+For the **message → WebSocket event** test: **relay** (core-service outbox → Redis). Start it from core-service: `npm run relay`.
 
 ## Steps to run E2E
 
@@ -31,12 +31,15 @@ Optional for event flow: **relay** (core-service outbox → Redis).
    - core-service: `cd core-service && npm run start:dev` (port 3002)
    - realtime-gateway: `cd realtime-gateway && npm run start:dev` (port 3010)
 
-3. **Optional sanity checks** (services up and reachable):
+3. **Start relay** (for the “message → event on WebSocket” test; from core-service repo):
+   - `cd core-service && npm run relay` (polls outbox, publishes to Redis; needs same DATABASE_URL and REDIS_URL as core)
+
+4. **Optional sanity checks** (services up and reachable):
    - `Invoke-RestMethod http://localhost:3001/health -UseBasicParsing` (identity)
    - `Invoke-RestMethod http://localhost:3002/health -UseBasicParsing` (core)
    - `Invoke-RestMethod http://localhost:3010/health/ready -UseBasicParsing` (realtime-gateway + Redis)
 
-4. **Run E2E** (from this repo):
+5. **Run E2E** (from this repo):
    ```bash
    cd ayncor-e2e
    npm install
@@ -65,6 +68,7 @@ Tests expect default base URLs and a bootstrap user. Override with env:
 
 - **login → channel → thread → message**: Logs in to identity, creates channel/thread/message via core, lists messages.
 - **realtime-gateway: connect with token and subscribe to inbox**: Connects to realtime-gateway with JWT, subscribes to inbox, asserts `subscribed` frame.
+- **message created via core → event received on WebSocket (relay running)**: Subscribes to inbox over WebSocket, creates a message via core; asserts receipt of a `Core.MessageCreated` event for that thread. Requires relay running (`cd core-service && npm run relay`).
 
 ## Repo layout
 
