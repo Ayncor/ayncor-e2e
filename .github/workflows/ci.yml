@@ -1,0 +1,35 @@
+# CI for ayncor-e2e (development, staging, main)
+# Runs unit/build checks. E2E tests require running services; point at staging URLs when configured.
+name: CI
+
+on:
+  push:
+    branches: [development, staging, main]
+  pull_request:
+    branches: [development, staging, main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+        env:
+          # Optional: set repo vars (IDENTITY_URL, CORE_URL, REALTIME_WS_URL) and secrets (E2E_EMAIL, E2E_PASSWORD) for E2E against staging
+          IDENTITY_URL: ${{ vars.IDENTITY_URL }}
+          CORE_URL: ${{ vars.CORE_URL }}
+          REALTIME_WS_URL: ${{ vars.REALTIME_WS_URL }}
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          E2E_ORG_SLUG: ${{ vars.E2E_ORG_SLUG }}
