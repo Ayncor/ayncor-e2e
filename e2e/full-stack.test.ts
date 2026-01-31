@@ -2,16 +2,23 @@
  * E2E: identity-service → core-service → realtime-gateway.
  * Prereqs: identity (3001), core (3002), realtime-gateway (3010), Redis.
  * Third test (message → event on WS) also requires relay (core-service: npm run relay).
+ * When IDENTITY_URL is not set (e.g. CI without staging), the suite is skipped so CI passes.
  */
-const IDENTITY_URL = process.env.IDENTITY_URL ?? "http://localhost:3001";
-const CORE_URL = process.env.CORE_URL ?? "http://localhost:3002";
-const REALTIME_WS_URL = process.env.REALTIME_WS_URL ?? "ws://localhost:3010";
+const IDENTITY_URL = (process.env.IDENTITY_URL ?? "").trim() || "http://localhost:3001";
+const CORE_URL = (process.env.CORE_URL ?? "").trim() || "http://localhost:3002";
+const REALTIME_WS_URL = (process.env.REALTIME_WS_URL ?? "").trim() || "ws://localhost:3010";
 
 const TEST_USER = {
-  email: process.env.E2E_EMAIL ?? "admin@ayncor.local",
-  password: process.env.E2E_PASSWORD ?? "ayncor@123",
-  org_slug: process.env.E2E_ORG_SLUG ?? "ayncor"
+  email: (process.env.E2E_EMAIL ?? "").trim() || "admin@ayncor.local",
+  password: (process.env.E2E_PASSWORD ?? "").trim() || "ayncor@123",
+  org_slug: (process.env.E2E_ORG_SLUG ?? "").trim() || "ayncor"
 };
+
+const hasE2ETarget =
+  !process.env.CI ||
+  (process.env.IDENTITY_URL ?? "").trim() !== "" ||
+  (process.env.CORE_URL ?? "").trim() !== "" ||
+  (process.env.REALTIME_WS_URL ?? "").trim() !== "";
 
 async function login(): Promise<{ access_token: string; org_id: string }> {
   const res = await fetch(`${IDENTITY_URL}/auth/login`, {
@@ -39,7 +46,7 @@ async function coreFetch(path: string, token: string, options: RequestInit = {})
   });
 }
 
-describe("E2E full stack", () => {
+(hasE2ETarget ? describe : describe.skip)("E2E full stack", () => {
   it("login → channel → thread → message", async () => {
     const { access_token, org_id } = await login();
     expect(access_token).toBeTruthy();
