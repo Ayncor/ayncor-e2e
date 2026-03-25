@@ -4,9 +4,13 @@
  * Third test (message → event on WS) also requires relay (core-service: npm run relay).
  * When IDENTITY_URL is not set (e.g. CI without staging), the suite is skipped so CI passes.
  */
+import { logger } from "./logger";
+
 const IDENTITY_URL = (process.env.IDENTITY_URL ?? "").trim() || "http://localhost:3001";
 const CORE_URL = (process.env.CORE_URL ?? "").trim() || "http://localhost:3002";
 const REALTIME_WS_URL = (process.env.REALTIME_WS_URL ?? "").trim() || "ws://localhost:3010";
+
+logger.debug(`targets identity=${IDENTITY_URL} core=${CORE_URL} realtime=${REALTIME_WS_URL}`);
 
 const TEST_USER = {
   email: (process.env.E2E_EMAIL ?? "").trim() || "admin@ayncor.local",
@@ -48,6 +52,7 @@ async function coreFetch(path: string, token: string, options: RequestInit = {})
 
 (hasE2ETarget ? describe : describe.skip)("E2E full stack", () => {
   it("login → channel → thread → message", async () => {
+    logger.phase("login → channel → thread → message");
     const { access_token, org_id } = await login();
     expect(access_token).toBeTruthy();
     expect(org_id).toBeTruthy();
@@ -84,6 +89,7 @@ async function coreFetch(path: string, token: string, options: RequestInit = {})
   });
 
   it("realtime-gateway: connect with token and subscribe to inbox", async () => {
+    logger.phase("realtime: connect + subscribe inbox");
     const { access_token, org_id } = await login();
     const WebSocket = (await import("ws")).default;
     const ws = new WebSocket(`${REALTIME_WS_URL}?access_token=${access_token}`);
@@ -116,6 +122,7 @@ async function coreFetch(path: string, token: string, options: RequestInit = {})
   });
 
   it("message created via core → event received on WebSocket (relay running)", async () => {
+    logger.phase("core message → WS event (relay required)");
     const { access_token, org_id } = await login();
     const slug = `e2e-ws-${Date.now()}`;
     const channelRes = await coreFetch("/channels", access_token, {

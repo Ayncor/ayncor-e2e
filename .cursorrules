@@ -1,0 +1,94 @@
+You are a 100x systems software engineer working on the **ayncor-e2e** repository.
+
+This repo contains **cross-repo end-to-end tests** for:
+- `identity-service` (auth, orgs, membership)
+- `core-service` (channels, threads, messages, inbox)
+- `realtime-gateway` (WebSocket auth + subscribe, event fan-out)
+
+Your focus is correctness, determinism, and debuggability with **clean CI output**.
+
+────────────────────────────────────────
+REPO RESPONSIBILITY
+────────────────────────────────────────
+
+This repo is responsible ONLY for:
+- E2E test coverage across the running services (local or deployed)
+- Lightweight orchestration assumptions (URLs, env vars, prerequisites)
+- Stable test data patterns (unique slugs/ids per run, no coupling between tests)
+
+This repo does NOT own:
+- backend business logic changes (make changes in the relevant service repo)
+- contracts changes (make changes in `contracts/` + relevant service, then update tests)
+- frontend/client code
+
+If a behavior mismatch is found:
+- prefer filing/fixing it in the service/contract first
+- keep tests aligned to contracts (source of truth) unless tests are validating a deliberate divergence
+
+────────────────────────────────────────
+TESTING STACK (FIXED)
+────────────────────────────────────────
+
+- Test runner: Jest
+- Language: TypeScript
+- HTTP: `fetch`
+- WebSocket client: `ws`
+- Runtime: Node.js
+
+Do NOT introduce heavy frameworks here (Nest, Express servers, DB clients, Prisma, etc.).
+
+────────────────────────────────────────
+ENVIRONMENT & EXECUTION MODEL
+────────────────────────────────────────
+
+Tests run against **already-running services**.
+
+Default targets:
+- identity: `http://localhost:3001` (env: `IDENTITY_URL`)
+- core: `http://localhost:3002` (env: `CORE_URL`)
+- realtime gateway: `ws://localhost:3010` (env: `REALTIME_WS_URL`)
+
+Credentials (override via env):
+- `E2E_EMAIL`, `E2E_PASSWORD`, `E2E_ORG_SLUG`
+
+CI behavior:
+- If no targets are configured (e.g. CI without staging), tests should **skip** rather than fail.
+- Never require manual interactive input.
+
+────────────────────────────────────────
+LOGGING (REQUIRED)
+────────────────────────────────────────
+
+- Use `ayncor-e2e/e2e/logger.ts` (`logger`) for any harness logging.
+- Keep default Jest output clean:
+  - Use `logger.phase(...)` only when `E2E_VERBOSE=1`
+  - Use `logger.debug(...)` for troubleshooting; it prints when `DEBUG=1` or `E2E_VERBOSE=1`
+- Do NOT use `console.*` directly in tests/helpers.
+- Never log secrets (tokens, passwords, refresh tokens).
+
+────────────────────────────────────────
+E2E DESIGN RULES
+────────────────────────────────────────
+
+- Tests must be **idempotent** and safe to re-run:
+  - Use unique slugs/identifiers (e.g. `e2e-${Date.now()}`) to avoid collisions.
+  - Do not assume shared state across tests.
+- Prefer explicit assertions with helpful error messages:
+  - On non-2xx responses, include status + body text in thrown errors.
+- Timeouts:
+  - WebSocket/event tests must have explicit timeouts and actionable messages (e.g. “is relay running?”).
+- Avoid flaky ordering assumptions:
+  - Realtime events are hints; validate minimal contract expectations.
+- When adding new tests:
+  - Keep them small and focused (one behavior per test).
+  - Add prerequisites to `README.md` when needed (e.g. relay required).
+
+────────────────────────────────────────
+CONTRACTS ALIGNMENT (CRITICAL)
+────────────────────────────────────────
+
+- Contracts are the single source of truth:
+  - identity: `contracts/v1/openapi/identity-service.openapi.yaml`
+  - core: `contracts/v1/openapi/core-service.openapi.yaml`
+  - realtime: `contracts/v1/realtime/protocol.md`
+- If contracts change, update tests in the same change set.

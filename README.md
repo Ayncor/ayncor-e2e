@@ -63,6 +63,8 @@ Tests expect default base URLs and a bootstrap user. Override with env:
 - `CORE_URL` – core-service base URL (default `http://localhost:3002`)
 - `REALTIME_WS_URL` – realtime-gateway WebSocket URL (default `ws://localhost:3010`)
 - `E2E_EMAIL`, `E2E_PASSWORD`, `E2E_ORG_SLUG` – login user (default `admin@ayncor.local` / `ayncor@123` / `ayncor`)
+- `E2E_VERBOSE=1` – print step breadcrumbs (`logger.phase`) during tests
+- `DEBUG=1` – print debug lines from `e2e/logger.ts` (includes target URLs on load)
 
 ## Tests
 
@@ -72,6 +74,6 @@ Tests expect default base URLs and a bootstrap user. Override with env:
 
 ## Repo layout
 
-- `e2e/` – E2E specs (Jest)
+- `e2e/` – E2E specs (Jest) and `e2e/logger.ts` (prefixed logging; verbose via `E2E_VERBOSE` / `DEBUG`)
 - `package.json` – Node + Jest + ws
 - `jest.config.js` – test match `e2e/**/*.test.ts`, timeout 30s
